@@ -3,6 +3,8 @@ import { BlurView } from "expo-blur";
 import { Tabs } from "expo-router";
 import React from "react";
 import { Platform, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { HeartBanner } from "@/components/HeartBanner";
 import colors from "@/constants/colors";
 import { useDownloads } from "@/contexts/DownloadContext";
 
@@ -24,10 +26,15 @@ function TabIcon({
 
 export default function TabLayout() {
   const { activeCount } = useDownloads();
+  const insets = useSafeAreaInsets();
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
 
   return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <View style={{ paddingTop: insets.top }}>
+        <HeartBanner />
+      </View>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -99,6 +106,15 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="stream"
+        options={{
+          title: "Spot D",
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="radio" color={color} focused={focused} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="library"
         options={{
           title: "Library",
@@ -117,6 +133,7 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+    </View>
   );
 }
 

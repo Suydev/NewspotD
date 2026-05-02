@@ -135,7 +135,8 @@ export function DownloadProvider({ children }: { children: React.ReactNode }) {
 
         const dir = `${FileSystem.documentDirectory}spotd/`;
         await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
-        const safeName = `${track.name.replace(/[^a-z0-9]/gi, "_")}_${track.id}.mp3`;
+        const ext = cobalt.ext || "mp3";
+        const safeName = `${track.name.replace(/[^a-z0-9]/gi, "_")}_${track.id}.${ext}`;
         const dest = dir + safeName;
 
         await FileSystem.downloadAsync(cobalt.url, dest);
@@ -178,13 +179,13 @@ export function DownloadProvider({ children }: { children: React.ReactNode }) {
       add(record);
 
       try {
-        if (parsed.kind === "spotify-track" || parsed.kind === "spotify-playlist" || parsed.kind === "spotify-album") {
+        if (parsed.kind === "spotify-track" || parsed.kind === "spotify-episode" || parsed.kind === "spotify-playlist" || parsed.kind === "spotify-album") {
           let collection;
           setDownloads((prev) =>
             prev.map((d) => (d.id === id ? { ...d, status: "fetching" } : d))
           );
 
-          if (parsed.kind === "spotify-track") {
+          if (parsed.kind === "spotify-track" || parsed.kind === "spotify-episode") {
             collection = await fetchSpotifyTrack(parsed.raw);
           } else {
             collection = await fetchSpotifyCollection(
@@ -279,7 +280,7 @@ export function DownloadProvider({ children }: { children: React.ReactNode }) {
 
           const dir = `${FileSystem.documentDirectory}spotd/`;
           await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
-          const ext = settings.downloadMode === "video" ? "mp4" : "mp3";
+          const ext = cobalt.ext || (settings.downloadMode === "video" ? "mp4" : "mp3");
           const safeName = `${info.title.replace(/[^a-z0-9]/gi, "_")}_${parsed.id}.${ext}`;
           const dest = dir + safeName;
 
@@ -381,7 +382,7 @@ export function DownloadProvider({ children }: { children: React.ReactNode }) {
 
                 const dir = `${FileSystem.documentDirectory}spotd/`;
                 await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
-                const ext = settings.downloadMode === "video" ? "mp4" : "mp3";
+                const ext = cobalt.ext || (settings.downloadMode === "video" ? "mp4" : "mp3");
                 const safeName = `${track.name.replace(/[^a-z0-9]/gi, "_")}_${track.id}.${ext}`;
                 const dest = dir + safeName;
 

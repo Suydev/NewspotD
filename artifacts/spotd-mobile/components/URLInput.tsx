@@ -15,9 +15,10 @@ import { ParsedUrl, getUrlLabel, parseUrl } from "@/utils/urlParser";
 
 interface Props {
   onSubmit: (parsed: ParsedUrl) => void;
+  placeholder?: string;
 }
 
-export function URLInput({ onSubmit }: Props) {
+export function URLInput({ onSubmit, placeholder }: Props) {
   const [value, setValue] = useState("");
   const [parsed, setParsed] = useState<ParsedUrl | null>(null);
   const [error, setError] = useState("");
@@ -90,7 +91,7 @@ export function URLInput({ onSubmit }: Props) {
           style={styles.input}
           value={value}
           onChangeText={handleChange}
-          placeholder="Paste Spotify or YouTube URL…"
+          placeholder={placeholder ?? "Paste Spotify or YouTube URL…"}
           placeholderTextColor={colors.textTertiary}
           autoCapitalize="none"
           autoCorrect={false}

@@ -16,7 +16,7 @@ export default function DownloadsScreen() {
   const insets = useSafeAreaInsets();
   const { downloads, cancelDownload, removeDownload, activeCount } = useDownloads();
 
-  const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const topPad = 0;
   const botPad = Platform.OS === "web" ? 34 : 0;
 
   const active = downloads.filter(

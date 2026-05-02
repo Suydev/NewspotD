@@ -100,7 +100,7 @@ export default function SettingsScreen() {
   const { settings, update } = useSettings();
   const { downloads } = useDownloads();
 
-  const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const topPad = 0;
   const botPad = Platform.OS === "web" ? 34 : 0;
 
   const handleClearHistory = () => {
@@ -147,12 +147,13 @@ export default function SettingsScreen() {
 
       <Section title="AUDIO QUALITY">
         <OptionRow
-          label="MP3 Bitrate"
+          label="Format"
           value={settings.audioQuality}
           options={[
             { label: "128 kbps", value: "128" },
             { label: "192 kbps", value: "192" },
             { label: "320 kbps", value: "320" },
+            { label: "FLAC (Best)", value: "flac" },
           ]}
           onSelect={(v) => update({ audioQuality: v })}
         />
@@ -167,6 +168,9 @@ export default function SettingsScreen() {
             { label: "480p", value: "480" },
             { label: "720p", value: "720" },
             { label: "1080p", value: "1080" },
+            { label: "1440p", value: "1440" },
+            { label: "4K", value: "2160" },
+            { label: "8K", value: "4320" },
           ]}
           onSelect={(v) => update({ videoQuality: v })}
         />

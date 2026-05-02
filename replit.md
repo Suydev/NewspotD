@@ -62,8 +62,20 @@ pnpm workspace monorepo using TypeScript. Based on [Spot-Professional](https://g
 - **Spotify integration**: tracks, albums, playlists, podcast episodes/shows
 
 ### Mobile (artifacts/spotd-mobile)
-- Expo React Native app with download + streaming tabs
+- **Fully local** — no Express server needed; uses Cobalt API instances + Invidious direct streams
+- **HeartBanner**: beating ❤️ animation at the top of all screens (safe area aware)
+- **Download tab** (`index.tsx`): 3 sub-tabs — Spotify, YouTube, Podcast
+  - Cobalt multi-instance fallback + Invidious direct M4A/OPUS stream fallback
+  - Podcast episodes (Spotify show/episode URLs) supported
+- **Queue tab** (`downloads.tsx`): live download queue with cancel/remove
+- **Spot D tab** (`stream.tsx`): Invidious search + expo-av streaming + genre browse tiles
+- **Library tab** (`library.tsx`): browse local downloaded files with share/delete
+- **Settings tab** (`settings.tsx`): Audio quality (MP3 128–320kbps, FLAC), Video quality (360p, 720p, 1080p, 1440p, 4K, 8K)
+- **Quality support**: FLAC audio, 4K (2160p), 8K (4320p) video options added to storage.ts
+- **`utils/cobalt.ts`**: tries 7+ community Cobalt instances then falls back to Invidious direct URL
+- **`utils/invidious.ts`**: 10 Invidious instances, instance caching, `getAudioStreamUrl()` for direct M4A/OPUS
 - `eas.json` configured with `preview` profile for APK builds
+- **Dependencies**: `expo-av`, `expo-linear-gradient`, `expo-blur`, `expo-haptics`
 
 ### CI/CD
 - `.github/workflows/build-apk.yml` — two jobs:

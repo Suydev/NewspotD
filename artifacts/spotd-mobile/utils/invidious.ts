@@ -4,6 +4,11 @@ const INSTANCES = [
   "https://invidious.fdn.fr",
   "https://invidious.nerdvpn.de",
   "https://inv.tux.pizza",
+  "https://invidious.slipfox.xyz",
+  "https://yt.drgnz.club",
+  "https://invidious.io.lol",
+  "https://invidious.perennialte.ch",
+  "https://vid.puffyan.us",
 ];
 
 export interface InvidiousVideo {
@@ -23,6 +28,8 @@ export interface YoutubeInfo {
   thumbnail: string;
 }
 
+let workingInstance: string | null = null;
+
 async function tryInstance(instance: string, path: string): Promise<any> {
   const res = await fetch(`${instance}${path}`, {
     headers: { Accept: "application/json" },
@@ -32,11 +39,17 @@ async function tryInstance(instance: string, path: string): Promise<any> {
   return res.json();
 }
 
-async function tryAll(path: string): Promise<any> {
+async function tryAll(path: string): Promise<{ data: any; instance: string }> {
+  const ordered = workingInstance
+    ? [workingInstance, ...INSTANCES.filter((i) => i !== workingInstance)]
+    : INSTANCES;
+
   let lastError: Error | null = null;
-  for (const inst of INSTANCES) {
+  for (const inst of ordered) {
     try {
-      return await tryInstance(inst, path);
+      const data = await tryInstance(inst, path);
+      workingInstance = inst;
+      return { data, instance: inst };
     } catch (e) {
       lastError = e as Error;
     }
@@ -46,9 +59,11 @@ async function tryAll(path: string): Promise<any> {
 
 export async function searchYouTube(query: string): Promise<InvidiousVideo[]> {
   const q = encodeURIComponent(query);
-  const data = await tryAll(`/api/v1/search?q=${q}&type=video&fields=videoId,title,author,lengthSeconds,viewCount`);
+  const { data } = await tryAll(
+    `/api/v1/search?q=${q}&type=video&fields=videoId,title,author,lengthSeconds,viewCount`
+  );
   if (!Array.isArray(data)) return [];
-  return data.slice(0, 5).map((v: any) => ({
+  return data.slice(0, 10).map((v: any) => ({
     videoId: v.videoId,
     title: v.title,
     author: v.author,
@@ -59,9 +74,12 @@ export async function searchYouTube(query: string): Promise<InvidiousVideo[]> {
 }
 
 export async function getYouTubeVideoInfo(videoId: string): Promise<YoutubeInfo> {
-  const data = await tryAll(`/api/v1/videos/${videoId}?fields=videoId,title,author,lengthSeconds,videoThumbnails`);
-  const thumb = data.videoThumbnails?.find((t: any) => t.quality === "medium")?.url
-    ?? `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+  const { data } = await tryAll(
+    `/api/v1/videos/${videoId}?fields=videoId,title,author,lengthSeconds,videoThumbnails`
+  );
+  const thumb =
+    data.videoThumbnails?.find((t: any) => t.quality === "medium")?.url ??
+    `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
   return {
     videoId: data.videoId,
     title: data.title,
@@ -71,8 +89,37 @@ export async function getYouTubeVideoInfo(videoId: string): Promise<YoutubeInfo>
   };
 }
 
-export async function getYouTubePlaylist(playlistId: string): Promise<{ title: string; videos: InvidiousVideo[] }> {
-  const data = await tryAll(`/api/v1/playlists/${playlistId}`);
+export async function getAudioStreamUrl(
+  videoId: string
+): Promise<{ url: string; ext: string }> {
+  const { data, instance } = await tryAll(
+    `/api/v1/videos/${videoId}?fields=adaptiveFormats,formatStreams`
+  );
+
+  const formats: any[] = data.adaptiveFormats || [];
+
+  const opus = formats.find(
+    (f: any) => (f.type || "").includes("audio/webm") && f.itag === 251
+  );
+  const m4a = formats.find(
+    (f: any) => (f.type || "").includes("audio/mp4") && f.itag === 140
+  );
+  const bestAudio = opus || m4a || formats.find((f: any) => (f.type || "").includes("audio/"));
+
+  if (bestAudio?.url) {
+    return {
+      url: bestAudio.url,
+      ext: (bestAudio.type || "").includes("webm") ? "webm" : "m4a",
+    };
+  }
+
+  return { url: `${instance}/latest_version?id=${videoId}&itag=140&local=true`, ext: "m4a" };
+}
+
+export async function getYouTubePlaylist(
+  playlistId: string
+): Promise<{ title: string; videos: InvidiousVideo[] }> {
+  const { data } = await tryAll(`/api/v1/playlists/${playlistId}`);
   const videos: InvidiousVideo[] = (data.videos || []).map((v: any) => ({
     videoId: v.videoId,
     title: v.title,

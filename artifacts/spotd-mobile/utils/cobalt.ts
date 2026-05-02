@@ -1,86 +1,106 @@
-const COBALT_ENDPOINT = "https://api.cobalt.tools";
+import { getAudioStreamUrl } from "./invidious";
 
-export type AudioQuality = "128" | "192" | "320";
-export type VideoQuality = "360" | "480" | "720" | "1080";
+export type AudioQuality = "128" | "192" | "320" | "flac";
+export type VideoQuality = "360" | "480" | "720" | "1080" | "1440" | "2160" | "4320";
 
 export interface CobaltResult {
   url: string;
   filename: string;
+  ext: string;
+}
+
+const COBALT_INSTANCES = [
+  "https://api.cobalt.tools",
+  "https://cobalt-api.ayo.tf",
+  "https://cobalt.api.timelessnesses.me",
+];
+
+async function tryCobaltInstance(
+  instance: string,
+  body: object
+): Promise<CobaltResult> {
+  const res = await fetch(instance, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15000),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Cobalt ${res.status}: ${text.slice(0, 120)}`);
+  }
+
+  const data = await res.json();
+
+  if (data.status === "error") {
+    throw new Error(data.error?.code || "Cobalt error");
+  }
+
+  const url = data.url;
+  if (!url) throw new Error("No URL in Cobalt response");
+  return { url, filename: data.filename || "media", ext: "mp3" };
 }
 
 export async function getCobaltAudioUrl(
   youtubeUrl: string,
   bitrate: AudioQuality = "320"
 ): Promise<CobaltResult> {
-  const res = await fetch(COBALT_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({
-      url: youtubeUrl,
-      downloadMode: "audio",
-      audioFormat: "mp3",
-      audioBitrate: bitrate,
-    }),
-    signal: AbortSignal.timeout(15000),
-  });
+  const isFlac = bitrate === "flac";
+  const audioFormat = isFlac ? "best" : "mp3";
+  const audioBitrate = isFlac ? "320" : bitrate;
+  const ext = isFlac ? "webm" : "mp3";
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Cobalt API error ${res.status}: ${text.slice(0, 200)}`);
+  const body = {
+    url: youtubeUrl,
+    downloadMode: "audio",
+    audioFormat,
+    audioBitrate,
+  };
+
+  for (const instance of COBALT_INSTANCES) {
+    try {
+      const result = await tryCobaltInstance(instance, body);
+      return { ...result, ext };
+    } catch {
+    }
   }
 
-  const data = await res.json();
+  const videoId = youtubeUrl.match(/[?&]v=([^&]+)/)?.[1] ?? youtubeUrl.split("youtu.be/")[1]?.split("?")[0] ?? "";
+  if (!videoId) throw new Error("Could not extract video ID for fallback");
 
-  if (data.status === "error") {
-    throw new Error(data.error?.code || "Cobalt returned an error");
-  }
-
-  if (data.status === "tunnel" || data.status === "redirect") {
-    return { url: data.url, filename: data.filename || "audio.mp3" };
-  }
-
-  if (data.url) {
-    return { url: data.url, filename: data.filename || "audio.mp3" };
-  }
-
-  throw new Error("Cobalt did not return a download URL");
+  const stream = await getAudioStreamUrl(videoId);
+  return {
+    url: stream.url,
+    filename: `audio.${stream.ext}`,
+    ext: stream.ext,
+  };
 }
 
 export async function getCobaltVideoUrl(
   youtubeUrl: string,
   quality: VideoQuality = "720"
 ): Promise<CobaltResult> {
-  const res = await fetch(COBALT_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({
-      url: youtubeUrl,
-      downloadMode: "auto",
-      videoQuality: quality,
-    }),
-    signal: AbortSignal.timeout(15000),
-  });
+  const body = {
+    url: youtubeUrl,
+    downloadMode: "auto",
+    videoQuality: quality,
+  };
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Cobalt API error ${res.status}: ${text.slice(0, 200)}`);
+  for (const instance of COBALT_INSTANCES) {
+    try {
+      const result = await tryCobaltInstance(instance, body);
+      return { ...result, ext: "mp4" };
+    } catch {
+    }
   }
 
-  const data = await res.json();
+  const videoId = youtubeUrl.match(/[?&]v=([^&]+)/)?.[1] ?? youtubeUrl.split("youtu.be/")[1]?.split("?")[0] ?? "";
+  if (!videoId) throw new Error("Could not get video stream");
 
-  if (data.status === "error") {
-    throw new Error(data.error?.code || "Cobalt returned an error");
-  }
-
-  if (data.url) {
-    return { url: data.url, filename: data.filename || "video.mp4" };
-  }
-
-  throw new Error("Cobalt did not return a download URL");
+  const stream = await getAudioStreamUrl(videoId);
+  return { url: stream.url, filename: `video.${stream.ext}`, ext: stream.ext };
 }

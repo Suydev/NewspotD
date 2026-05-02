@@ -2,7 +2,15 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export interface DownloadRecord {
   id: string;
-  kind: "spotify-track" | "spotify-playlist" | "spotify-album" | "youtube-video" | "youtube-playlist" | "youtube-shorts";
+  kind:
+    | "spotify-track"
+    | "spotify-playlist"
+    | "spotify-album"
+    | "spotify-episode"
+    | "youtube-video"
+    | "youtube-playlist"
+    | "youtube-shorts"
+    | "podcast";
   name: string;
   coverUrl: string;
   totalTracks: number;
@@ -26,8 +34,8 @@ export interface TrackRecord {
   error?: string;
 }
 
-const DOWNLOADS_KEY = "spotd_downloads_v2";
-const SETTINGS_KEY = "spotd_settings_v1";
+const DOWNLOADS_KEY = "spotd_downloads_v3";
+const SETTINGS_KEY = "spotd_settings_v2";
 
 export async function getDownloads(): Promise<DownloadRecord[]> {
   try {
@@ -48,7 +56,10 @@ export async function saveDownload(record: DownloadRecord): Promise<void> {
 
 export async function deleteDownload(id: string): Promise<void> {
   const all = await getDownloads();
-  await AsyncStorage.setItem(DOWNLOADS_KEY, JSON.stringify(all.filter((d) => d.id !== id)));
+  await AsyncStorage.setItem(
+    DOWNLOADS_KEY,
+    JSON.stringify(all.filter((d) => d.id !== id))
+  );
 }
 
 export async function clearAllDownloads(): Promise<void> {
@@ -56,8 +67,8 @@ export async function clearAllDownloads(): Promise<void> {
 }
 
 export interface AppSettings {
-  audioQuality: "128" | "192" | "320";
-  videoQuality: "360" | "480" | "720" | "1080";
+  audioQuality: "128" | "192" | "320" | "flac";
+  videoQuality: "360" | "480" | "720" | "1080" | "1440" | "2160" | "4320";
   downloadMode: "audio" | "video";
   saveToGallery: boolean;
   maxConcurrent: number;
@@ -80,7 +91,9 @@ export async function getSettings(): Promise<AppSettings> {
   }
 }
 
-export async function saveSettings(settings: Partial<AppSettings>): Promise<AppSettings> {
+export async function saveSettings(
+  settings: Partial<AppSettings>
+): Promise<AppSettings> {
   const current = await getSettings();
   const updated = { ...current, ...settings };
   await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(updated));

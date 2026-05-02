@@ -4,88 +4,95 @@ import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { URLInput } from "@/components/URLInput";
 import colors from "@/constants/colors";
 import { useDownloads } from "@/contexts/DownloadContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import type { ParsedUrl } from "@/utils/urlParser";
 
-const TIPS = [
+type Tab = "spotify" | "youtube" | "podcast";
+
+const TAB_INFO: Record<
+  Tab,
   {
-    icon: "music" as const,
-    label: "Spotify Track",
-    hint: "open.spotify.com/track/…",
+    label: string;
+    color: string;
+    icon: React.ComponentProps<typeof Feather>["name"];
+    placeholder: string;
+    tips: {
+      icon: React.ComponentProps<typeof Feather>["name"];
+      label: string;
+      hint: string;
+    }[];
+  }
+> = {
+  spotify: {
+    label: "Spotify",
     color: colors.spotify,
+    icon: "music",
+    placeholder: "Paste Spotify track, album or playlist URL…",
+    tips: [
+      { icon: "music", label: "Track", hint: "open.spotify.com/track/…" },
+      { icon: "disc", label: "Album", hint: "open.spotify.com/album/…" },
+      { icon: "list", label: "Playlist", hint: "open.spotify.com/playlist/…" },
+      { icon: "mic", label: "Podcast Episode", hint: "open.spotify.com/episode/…" },
+    ],
   },
-  {
-    icon: "list" as const,
-    label: "Spotify Playlist",
-    hint: "open.spotify.com/playlist/…",
-    color: colors.spotify,
-  },
-  {
-    icon: "disc" as const,
-    label: "Spotify Album",
-    hint: "open.spotify.com/album/…",
-    color: colors.spotify,
-  },
-  {
-    icon: "youtube" as const,
-    label: "YouTube Video",
-    hint: "youtube.com/watch?v=…",
+  youtube: {
+    label: "YouTube",
     color: colors.youtube,
+    icon: "youtube",
+    placeholder: "Paste YouTube video or playlist URL…",
+    tips: [
+      { icon: "youtube", label: "Video (up to 8K)", hint: "youtube.com/watch?v=…" },
+      { icon: "film", label: "Short", hint: "youtube.com/shorts/…" },
+      { icon: "list", label: "Playlist (all videos)", hint: "youtube.com/playlist?list=…" },
+    ],
   },
-  {
-    icon: "film" as const,
-    label: "YouTube Shorts",
-    hint: "youtube.com/shorts/…",
-    color: colors.youtube,
+  podcast: {
+    label: "Podcasts",
+    color: "#ff9f0a",
+    icon: "mic",
+    placeholder: "Paste Spotify episode or podcast RSS feed URL…",
+    tips: [
+      { icon: "mic", label: "Spotify Episode", hint: "open.spotify.com/episode/…" },
+      { icon: "rss", label: "RSS Feed", hint: "yourpodcast.com/feed.rss" },
+    ],
   },
-  {
-    icon: "list" as const,
-    label: "YouTube Playlist",
-    hint: "youtube.com/playlist?list=…",
-    color: colors.youtube,
-  },
-];
+};
 
 export default function DownloaderScreen() {
-  const insets = useSafeAreaInsets();
   const { startDownload, activeCount } = useDownloads();
   const { settings } = useSettings();
   const router = useRouter();
-  const [lastSubmitted, setLastSubmitted] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<Tab>("spotify");
   const [success, setSuccess] = useState(false);
 
   const handleSubmit = async (parsed: ParsedUrl) => {
     try {
       await startDownload(parsed);
-      setLastSubmitted(parsed.raw);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2500);
       router.navigate("/(tabs)/downloads");
-    } catch (e: any) {
+    } catch {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
   };
 
-  const topPad = Platform.OS === "web" ? 67 : insets.top;
   const botPad = Platform.OS === "web" ? 34 : 0;
+  const tab = TAB_INFO[activeTab];
 
   return (
     <ScrollView
       style={styles.scroll}
-      contentContainerStyle={[
-        styles.content,
-        { paddingTop: topPad + 20, paddingBottom: botPad + 32 },
-      ]}
+      contentContainerStyle={[styles.content, { paddingTop: 20, paddingBottom: botPad + 32 }]}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
@@ -119,6 +126,35 @@ export default function DownloaderScreen() {
         )}
       </View>
 
+      <View style={styles.tabs}>
+        {(Object.keys(TAB_INFO) as Tab[]).map((key) => {
+          const t = TAB_INFO[key];
+          const active = activeTab === key;
+          return (
+            <Pressable
+              key={key}
+              style={[
+                styles.tabBtn,
+                active && { borderBottomColor: t.color, borderBottomWidth: 2 },
+              ]}
+              onPress={() => {
+                Haptics.selectionAsync();
+                setActiveTab(key);
+              }}
+            >
+              <Feather
+                name={t.icon}
+                size={14}
+                color={active ? t.color : colors.textTertiary}
+              />
+              <Text style={[styles.tabLabel, active && { color: t.color }]}>
+                {t.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
       {success && (
         <View style={styles.successBanner}>
           <Feather name="check-circle" size={15} color={colors.success} />
@@ -127,56 +163,76 @@ export default function DownloaderScreen() {
       )}
 
       <View style={styles.card}>
-        <URLInput onSubmit={handleSubmit} />
+        <URLInput onSubmit={handleSubmit} placeholder={tab.placeholder} />
       </View>
 
       <View style={styles.qualityRow}>
-        <View style={styles.qualityChip}>
-          <Feather name="headphones" size={13} color={colors.primary} />
-          <Text style={styles.qualityText}>
-            {settings.downloadMode === "audio"
-              ? `MP3 ${settings.audioQuality}kbps`
-              : `Video ${settings.videoQuality}p`}
+        <View style={[styles.qualityChip, { borderColor: tab.color + "55" }]}>
+          <Feather
+            name={
+              activeTab === "youtube" && settings.downloadMode === "video"
+                ? "video"
+                : "headphones"
+            }
+            size={13}
+            color={tab.color}
+          />
+          <Text style={[styles.qualityText, { color: tab.color }]}>
+            {activeTab === "youtube" && settings.downloadMode === "video"
+              ? `Video ${settings.videoQuality}p`
+              : settings.audioQuality === "flac"
+              ? "FLAC (Best)"
+              : `MP3 ${settings.audioQuality}kbps`}
           </Text>
         </View>
         <Text style={styles.qualityHint}>Change in Settings →</Text>
       </View>
 
       <View style={styles.tipsSection}>
-        <Text style={styles.tipsTitle}>Supported URLs</Text>
+        <Text style={styles.tipsTitle}>Supported</Text>
         <View style={styles.tipsGrid}>
-          {TIPS.map((tip) => (
+          {tab.tips.map((tip) => (
             <View key={tip.label} style={styles.tipChip}>
-              <Feather name={tip.icon} size={13} color={tip.color} />
+              <Feather name={tip.icon} size={13} color={tab.color} />
               <View>
                 <Text style={styles.tipLabel}>{tip.label}</Text>
-                <Text style={styles.tipHint} numberOfLines={1}>{tip.hint}</Text>
+                <Text style={styles.tipHint} numberOfLines={1}>
+                  {tip.hint}
+                </Text>
               </View>
             </View>
           ))}
         </View>
       </View>
+
+      {activeTab === "youtube" && (
+        <View style={styles.infoBox}>
+          <Feather name="zap" size={13} color={colors.youtube} />
+          <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+            Supports 4K (2160p) and 8K (4320p). Set preferred quality in
+            Settings → Video Quality.
+          </Text>
+        </View>
+      )}
+
+      {activeTab === "podcast" && (
+        <View style={[styles.infoBox, { borderColor: "#ff9f0a44" }]}>
+          <Feather name="shield" size={13} color="#ff9f0a" />
+          <Text style={[styles.infoText, { color: "#ff9f0a" }]}>
+            No Ads. Enjoy. Downloaded locally on your device — no account
+            required.
+          </Text>
+        </View>
+      )}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  content: {
-    paddingHorizontal: 20,
-    gap: 16,
-  },
-  heroSection: {
-    gap: 12,
-  },
-  logoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
+  scroll: { flex: 1, backgroundColor: colors.background },
+  content: { paddingHorizontal: 20, gap: 16 },
+  heroSection: { gap: 12 },
+  logoRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   logoIcon: {
     width: 44,
     height: 44,
@@ -187,11 +243,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.primary + "44",
   },
-  appName: {
-    fontSize: 22,
-    fontFamily: "Inter_700Bold",
-    color: colors.text,
-  },
+  appName: { fontSize: 22, fontFamily: "Inter_700Bold", color: colors.text },
   appSub: {
     fontSize: 11,
     fontFamily: "Inter_400Regular",
@@ -226,6 +278,26 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.primary,
     fontFamily: "Inter_500Medium",
+  },
+  tabs: {
+    flexDirection: "row",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  tabBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingVertical: 11,
+    borderBottomWidth: 2,
+    borderBottomColor: "transparent",
+  },
+  tabLabel: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: colors.textTertiary,
   },
   successBanner: {
     flexDirection: "row",
@@ -264,21 +336,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderWidth: 1,
-    borderColor: colors.border,
   },
-  qualityText: {
-    fontSize: 12,
-    color: colors.primary,
-    fontFamily: "Inter_500Medium",
-  },
+  qualityText: { fontSize: 12, fontFamily: "Inter_500Medium" },
   qualityHint: {
     fontSize: 12,
     color: colors.textTertiary,
     fontFamily: "Inter_400Regular",
   },
-  tipsSection: {
-    gap: 10,
-  },
+  tipsSection: { gap: 10 },
   tipsTitle: {
     fontSize: 13,
     fontFamily: "Inter_600SemiBold",
@@ -286,9 +351,7 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.8,
   },
-  tipsGrid: {
-    gap: 6,
-  },
+  tipsGrid: { gap: 6 },
   tipChip: {
     flexDirection: "row",
     alignItems: "center",
@@ -300,15 +363,27 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  tipLabel: {
-    fontSize: 13,
-    color: colors.text,
-    fontFamily: "Inter_500Medium",
-  },
+  tipLabel: { fontSize: 13, color: colors.text, fontFamily: "Inter_500Medium" },
   tipHint: {
     fontSize: 11,
     color: colors.textTertiary,
     fontFamily: "Inter_400Regular",
     marginTop: 1,
+  },
+  infoBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    backgroundColor: colors.surface,
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 18,
   },
 });
